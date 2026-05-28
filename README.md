@@ -26,7 +26,18 @@ Construido hasta el momento (Partes 1–2 de 4):
 - Rate limit en upload.
 - Tests con **moto** simulando S3 (bucket privado verificado).
 
-Pendiente: frontend React con dashboard y formularios (Parte 3), suite completa de seguridad (Parte 4).
+**Parte 3 — frontend React**
+- Vite + TypeScript + Tailwind + TanStack Query + React Router + react-hook-form + zod.
+- Login con persistencia de token y auto-logout en 401.
+- Dashboard con dos tabs: Altas y Exámenes.
+- Listados paginados con filtros (sede para admin, fecha, estado de envío).
+- Vistas de detalle de alta y examen; botón "Ver archivo" que pide la URL firmada al backend y la abre en pestaña nueva.
+- Formularios con validación cliente (zod) + servidor; staff queda forzado a su sede.
+- Input de WhatsApp con hint de código de país; el backend normaliza a E.164.
+- Carga de archivo con validación cliente de tipo y tamaño antes de subir.
+- Responsive (tablet/celular).
+
+Pendiente: suite completa de pruebas de seguridad (Parte 4).
 
 ## Estructura
 
@@ -35,7 +46,11 @@ backend/        FastAPI + SQLAlchemy + Alembic
   app/          código fuente
   alembic/      migraciones
   tests/        unit / integration / security
-frontend/       (Parte 3)
+frontend/       React + Vite + TypeScript + Tailwind + TanStack Query
+  src/api       cliente axios (interceptor JWT, manejo 401)
+  src/auth      AuthContext + ProtectedRoute
+  src/pages     login, dashboard, listados, detalles, formularios
+  src/components componentes compartidos (table, paginación, file upload, etc.)
 docker-compose.yml
 ```
 
@@ -49,6 +64,7 @@ docker compose up --build
 ```
 
 Disponibles:
+- **Frontend**: <http://localhost:5173>
 - API: <http://localhost:8000>
 - Docs Swagger: <http://localhost:8000/docs>
 - ReDoc: <http://localhost:8000/redoc>
@@ -61,6 +77,8 @@ Al primer arranque se crea automáticamente un admin con las credenciales de
 
 ### Opción B: sin Docker
 
+Backend:
+
 ```bash
 cd backend
 python -m venv .venv && source .venv/bin/activate
@@ -69,6 +87,15 @@ cp .env.example .env                    # editar valores
 # Asegúrate de tener Postgres corriendo en la URL configurada
 alembic upgrade head
 uvicorn app.main:app --reload
+```
+
+Frontend:
+
+```bash
+cd frontend
+npm install
+cp .env.example .env                    # ajusta VITE_API_URL si tu backend no está en :8000
+npm run dev                             # http://localhost:5173
 ```
 
 ## Probar la Parte 1 manualmente

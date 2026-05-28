@@ -19,6 +19,13 @@ venv/
 node_modules/
 dist/
 .vite/
+*.tsbuildinfo
+# Accidental tsc -b emits next to .tsx sources
+frontend/src/**/*.js
+frontend/src/**/*.d.ts
+!frontend/src/vite-env.d.ts
+frontend/vite.config.js
+frontend/vite.config.d.ts
 
 # IDE
 .idea/
