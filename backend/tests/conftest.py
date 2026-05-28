@@ -9,6 +9,15 @@ os.environ.setdefault("WHATSAPP_SERVICE_API_KEY", "test-api-key")
 os.environ.setdefault("CORS_ORIGINS", "http://localhost:5173")
 os.environ.setdefault("BOOTSTRAP_ADMIN_EMAIL", "")
 os.environ.setdefault("BOOTSTRAP_ADMIN_PASSWORD", "")
+# S3: leave S3_ENDPOINT_URL unset so boto3 uses AWS default and moto can intercept.
+os.environ.pop("S3_ENDPOINT_URL", None)
+os.environ.setdefault("S3_REGION", "us-east-1")
+os.environ.setdefault("S3_ACCESS_KEY_ID", "testing")
+os.environ.setdefault("S3_SECRET_ACCESS_KEY", "testing")
+os.environ.setdefault("S3_BUCKET", "animalopolis-examenes")
+os.environ.setdefault("S3_USE_PATH_STYLE", "true")
+os.environ.setdefault("S3_PRESIGNED_EXPIRES_SECONDS", "300")
+os.environ.setdefault("MAX_UPLOAD_SIZE_BYTES", str(2 * 1024 * 1024))  # 2 MiB for tests
 
 import pytest
 from fastapi.testclient import TestClient
@@ -126,3 +135,16 @@ def token_celeste(staff_ciudad_celeste):
 
 def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture()
+def s3_mock():
+    """Mocked S3 bucket for tests touching the storage layer. Requires
+    boto3 + moto. The bucket name matches settings.S3_BUCKET."""
+    import boto3
+    from moto import mock_aws
+
+    with mock_aws():
+        client = boto3.client("s3", region_name="us-east-1")
+        client.create_bucket(Bucket="animalopolis-examenes")
+        yield client

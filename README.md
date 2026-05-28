@@ -6,19 +6,27 @@ El envío por WhatsApp lo gestiona un sistema externo que consume la API REST do
 
 ## Estado actual
 
-Construido en este commit (Parte 1 de 4):
+Construido hasta el momento (Partes 1–2 de 4):
 
+**Parte 1 — backend, base de datos y auth/roles**
 - Backend FastAPI con estructura modular (routers / schemas / services / core / storage).
 - Postgres + SQLAlchemy 2.0 + Alembic con migración inicial.
 - Autenticación JWT, hashing argon2id, roles **admin / staff** con sistema de capabilities extensible.
-- Endpoints de **autenticación** (`/auth/login`, `/auth/me`).
-- Endpoints de **usuarios** (admin) y **altas** (con RBAC y aislamiento por sede).
+- Endpoints de autenticación, usuarios (admin) y altas (con RBAC y aislamiento por sede).
 - Endpoints `/envios/...` protegidos por **`X-API-Key`** para el sistema externo de WhatsApp.
-- Rate limit en login, headers de seguridad básicos, manejo de errores sin leaks.
-- Suite inicial de tests (unit + integración) con SQLite en memoria.
-- `docker-compose` con Postgres y MinIO (S3 local, listo para Parte 2).
+- Rate limit en login, headers de seguridad básicos, errores sin leaks.
 
-Pendiente: subida real a S3 (Parte 2), frontend React (Parte 3), suite completa de seguridad (Parte 4).
+**Parte 2 — integración S3**
+- `S3StorageBackend` real con boto3, compatible con AWS S3, Cloudflare R2 y MinIO (mismo código, distinto endpoint).
+- `POST /api/v1/examenes` (multipart): subida a S3, solo `storage_key` + metadatos en DB.
+- Validación de archivos: tipo permitido, tamaño máximo, **magic bytes** (detecta spoofing de MIME).
+- Listado y detalle de exámenes con RBAC (staff sólo su sede; admin todas).
+- `GET /api/v1/examenes/{id}/file-url` → URL firmada temporal (5 min por defecto).
+- `/envios/examenes/{pendientes,file-url,marcar-enviado}` para el sistema externo.
+- Rate limit en upload.
+- Tests con **moto** simulando S3 (bucket privado verificado).
+
+Pendiente: frontend React con dashboard y formularios (Parte 3), suite completa de seguridad (Parte 4).
 
 ## Estructura
 
@@ -105,7 +113,56 @@ curl -s http://localhost:8000/api/v1/envios/altas/pendientes \
 # 7. Marcar como enviada
 curl -s -X POST http://localhost:8000/api/v1/envios/altas/<ID>/marcar-enviado \
   -H "X-API-Key: dev-api-key-change-me"
+
+# 8. Subir un examen (multipart). Acepta application/pdf, image/{jpeg,png,webp}.
+curl -s -X POST http://localhost:8000/api/v1/examenes \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "sede=urdesa" \
+  -F "nombre_mascota=Firulais" \
+  -F "nombre_propietario=Juan Perez" \
+  -F "whatsapp=+593991234567" \
+  -F "tipo_examen=sangre" \
+  -F "consentimiento=true" \
+  -F "file=@/ruta/al/examen.pdf;type=application/pdf"
+
+# 9. Obtener URL firmada (válida unos minutos)
+curl -s http://localhost:8000/api/v1/examenes/<ID>/file-url \
+  -H "Authorization: Bearer $TOKEN"
+
+# 10. Sistema externo: examenes pendientes + URL firmada + marcar enviado
+curl -s http://localhost:8000/api/v1/envios/examenes/pendientes \
+  -H "X-API-Key: dev-api-key-change-me"
+
+curl -s http://localhost:8000/api/v1/envios/examenes/<ID>/file-url \
+  -H "X-API-Key: dev-api-key-change-me"
+
+curl -s -X POST http://localhost:8000/api/v1/envios/examenes/<ID>/marcar-enviado \
+  -H "X-API-Key: dev-api-key-change-me"
 ```
+
+## Validación de archivos
+
+La carga de exámenes valida en este orden y rechaza si algo falla:
+
+1. **Tamaño**: ≤ `MAX_UPLOAD_SIZE_BYTES` (default 15 MiB; configurable en `.env`).
+2. **Tipo declarado**: MIME debe estar en `ALLOWED_UPLOAD_MIME`
+   (`application/pdf`, `image/jpeg`, `image/png`, `image/webp`).
+3. **Magic bytes**: el contenido real debe corresponder al MIME declarado.
+   Un PDF con cabecera `MZ` (ejecutable) o un EXE con `Content-Type: image/png`
+   se rechaza con 422 — no llega a S3.
+
+El archivo se sube a S3 con la key `examenes/{sede}/{yyyy}/{mm}/{uuid}.{ext}`.
+**En la base de datos solo se guarda esa key + metadatos** (nombre original,
+mime, tamaño), nunca el archivo en sí.
+
+## Bucket S3 / R2
+
+- El bucket es **privado**: solo el backend con credenciales puede subir/leer.
+- El frontend y el sistema externo nunca tocan el bucket directamente; obtienen
+  una URL firmada vía la API (válida `S3_PRESIGNED_EXPIRES_SECONDS`, default 300s).
+- Para migrar de MinIO a AWS S3 o Cloudflare R2: cambiar las 5 variables
+  `S3_*` en el `.env`. **No hay que tocar código** — la misma clase `S3StorageBackend`
+  habla con los tres.
 
 ## Correr tests
 
@@ -127,9 +184,9 @@ Los tests usan SQLite en memoria y no requieren Postgres ni MinIO en marcha.
 | Alta — leer todas      |   ✓   | —                           |
 | Alta — leer su sede    |   —   | ✓                           |
 | Alta — marcar enviado  |   ✓   | —                           |
-| Examen — crear         |   ✓   | ✓ (Parte 2)                 |
-| Examen — leer          |   ✓   | ✓ (solo su sede, Parte 2)   |
-| Examen — descargar     |   ✓   | ✓ (Parte 2)                 |
+| Examen — crear         |   ✓   | ✓ (solo su sede)            |
+| Examen — leer          |   ✓   | ✓ (solo su sede)            |
+| Examen — descargar     |   ✓   | ✓ (solo su sede)            |
 | Usuarios — gestionar   |   ✓   | —                           |
 
 Añadir un rol nuevo (p.ej. `recepcion`) requiere solo dos cambios:
