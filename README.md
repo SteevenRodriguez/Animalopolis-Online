@@ -37,7 +37,21 @@ Construido hasta el momento (Partes 1–2 de 4):
 - Carga de archivo con validación cliente de tipo y tamaño antes de subir.
 - Responsive (tablet/celular).
 
-Pendiente: suite completa de pruebas de seguridad (Parte 4).
+**Parte 4 — suite completa de pruebas (backend)**
+- **147 tests** verdes en ~15s, **90.5 % de cobertura** del paquete `app/`.
+- `tests/unit/`: WhatsApp E.164, validación de archivos por magic bytes, matriz de capabilities, consentimiento obligatorio en todas sus formas.
+- `tests/integration/`: auth, altas, exámenes, listados con filtros, paginación, presigned URL, ciclo de envío externo, capa S3 con moto.
+- `tests/security/`:
+  - **RBAC** en todos los endpoints protegidos (sin token, token inválido/tamper/expirado, staff vs otra sede, staff en endpoints admin).
+  - **JWT**: firma incorrecta, algoritmo `none`, `sub` faltante/no-UUID, usuario desactivado, usuario inexistente.
+  - **SQL injection**: payloads clásicos en login, filtros y body — todos rechazados sin 500.
+  - **Subida de archivos**: HTML, SVG, ZIP, ELF disfrazados; path traversal en filenames; storage_key no contiene input del usuario; el bucket no recibe nada cuando la validación falla.
+  - **Hashing**: argon2id verificado, hashes únicos por salt, contraseñas nunca aparecen en respuestas ni dumps de DB.
+  - **Error leakage**: 4xx/5xx jamás incluyen stacktrace, paths, secretos, fragmentos SQL, ni distinguen "email no existe" de "contraseña incorrecta".
+  - **Security headers**: `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` en todas las respuestas (incluido errores).
+  - **CORS**: origen no permitido NO recibe `Access-Control-Allow-Origin`; con `Access-Control-Allow-Credentials: true` nunca se combina con `*`.
+  - **Presigned URL**: contiene `X-Amz-Signature` + `X-Amz-Expires` ≤ 1h; cada URL apunta a un único objeto; cliente anónimo (sin firma) no puede leer el bucket.
+  - **Rate limit**: login bombardeado devuelve 429 antes de los 15 intentos.
 
 ## Estructura
 
@@ -196,12 +210,27 @@ mime, tamaño), nunca el archivo en sí.
 ```bash
 cd backend
 pip install -e ".[dev]"          # si no lo hiciste
-pytest                            # corre unit + integration
-pytest tests/unit -v
-pytest tests/integration -v
+
+# Suite completa (147 tests, ~15s)
+pytest
+
+# Por categoría
+pytest tests/unit -v             # validaciones puras, sin DB ni HTTP
+pytest tests/integration -v      # endpoints + storage (SQLite + moto S3)
+pytest tests/security -v         # RBAC, JWT, SQLi, headers, leaks, presigned URL
+
+# Coverage
+pytest --cov --cov-report=term-missing
+pytest --cov --cov-report=html   # luego abre htmlcov/index.html
 ```
 
-Los tests usan SQLite en memoria y no requieren Postgres ni MinIO en marcha.
+Los tests usan **SQLite en memoria + moto** (mock de S3). No requieren Postgres
+ni MinIO en marcha — todo el harness corre aislado y sin red. La sesión de DB
+se recrea por cada test (rollback total entre tests).
+
+Cobertura actual del paquete `app/`: **90.5 %**. Líneas no cubiertas:
+admin user CRUD (PATCH/DELETE — no expuesto por el frontend en MVP) y
+bootstrap_admin (corre solo en startup real, no en tests).
 
 ## Roles y permisos
 

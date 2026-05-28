@@ -41,6 +41,26 @@ testpaths = ["tests"]
 addopts = "-v --tb=short"
 filterwarnings = [
     "ignore::DeprecationWarning",
+    "ignore::jwt.warnings.InsecureKeyLengthWarning",
+]
+
+[tool.coverage.run]
+source = ["app"]
+omit = [
+    "app/storage/local.py",
+    "app/__init__.py",
+    "app/*/__init__.py",
+]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
 ]
 
 [tool.ruff]
