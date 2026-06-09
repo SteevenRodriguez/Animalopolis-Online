@@ -33,15 +33,17 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-50 to-brand-50 px-4">
-      <div className="card w-full max-w-md">
-        <div className="mb-6 text-center">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-600 text-2xl">
-            🐾
-          </div>
-          <h1 className="text-2xl font-semibold text-slate-800">Animalópolis</h1>
-          <p className="text-sm text-slate-500">Inicia sesión para continuar</p>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-navy to-navy-dark px-4">
+      <div className="card w-full max-w-md overflow-hidden p-0">
+        <div className="bg-navy px-6 py-6 text-center">
+          <img src="/logo.png" alt="Animalópolis" className="mx-auto h-8 w-auto" />
         </div>
+        <div className="h-1 w-full bg-accent-500" />
+        <div className="p-6">
+          <div className="mb-6 text-center">
+            <h1 className="text-xl font-semibold text-slate-800">Bienvenido</h1>
+            <p className="text-sm text-slate-500">Inicia sesión para continuar</p>
+          </div>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="label" htmlFor="email">Email</label>
@@ -74,7 +76,8 @@ export function LoginPage() {
           <button type="submit" className="btn-primary w-full" disabled={submitting}>
             {submitting ? "Ingresando…" : "Ingresar"}
           </button>
-        </form>
+          </form>
+        </div>
       </div>
     </div>
   );

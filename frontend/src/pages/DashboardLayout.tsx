@@ -14,23 +14,23 @@ export function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="border-b border-slate-200 bg-white">
+      <header className="bg-navy text-white">
         <div className="mx-auto flex max-w-6xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
-            <span className="text-2xl">🐾</span>
-            <div>
-              <h1 className="text-lg font-semibold text-slate-800">Animalópolis</h1>
-              <p className="text-xs text-slate-500">
-                {user?.nombre} · {user?.rol}
-                {user?.sede ? ` · ${SEDE_LABEL[user.sede]}` : " · todas las sedes"}
-              </p>
-            </div>
+            <img src="/logo.png" alt="Animalópolis" className="h-7 w-auto" />
+            <p className="text-xs text-slate-300">
+              {user?.nombre} · {user?.rol}
+              {user?.sede ? ` · ${SEDE_LABEL[user.sede]}` : " · todas las sedes"}
+            </p>
           </div>
-          <button onClick={handleLogout} className="btn-secondary self-start sm:self-auto">
+          <button
+            onClick={handleLogout}
+            className="btn self-start border border-navy-light bg-navy-light text-white hover:bg-navy-dark sm:self-auto"
+          >
             Cerrar sesión
           </button>
         </div>
-        <nav className="border-t border-slate-200">
+        <nav className="border-t border-navy-light">
           <div className="mx-auto flex max-w-6xl gap-1 overflow-x-auto px-2 py-2">
             <NavTab to="/altas">Altas</NavTab>
             <NavTab to="/altas/nueva">+ Nueva alta</NavTab>
@@ -55,8 +55,8 @@ function NavTab({ to, children }: { to: string; children: React.ReactNode }) {
         clsx(
           "rounded-md px-3 py-2 text-sm font-medium whitespace-nowrap",
           isActive
-            ? "bg-brand-50 text-brand-700"
-            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+            ? "bg-navy-light text-accent-400"
+            : "text-slate-200 hover:bg-navy-light hover:text-white",
         )
       }
     >
