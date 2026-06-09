@@ -1,0 +1,27 @@
+# Modo temporal SIN dominio: HTTP plano en el puerto 80, accediendo por IP.
+# Cuando haya dominio, usar deploy/Caddyfile (HTTPS automático).
+{
+	auto_https off
+}
+
+:80 {
+	encode gzip
+
+	# URLs firmadas de MinIO (path-style): http://IP/animalopolis-examenes/...
+	# El bucket sigue privado: sin firma válida MinIO rechaza el acceso.
+	@s3 path /animalopolis-examenes/*
+	handle @s3 {
+		reverse_proxy minio:9000
+	}
+
+	# Backend FastAPI
+	@api path /api/* /docs /redoc /openapi.json /health
+	handle @api {
+		reverse_proxy backend:8000
+	}
+
+	# Frontend estático
+	handle {
+		reverse_proxy frontend:80
+	}
+}

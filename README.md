@@ -68,6 +68,12 @@ frontend/       React + Vite + TypeScript + Tailwind + TanStack Query
 docker-compose.yml
 ```
 
+## Deploy en producción
+
+Ver **[DEPLOY.md](DEPLOY.md)**: servidor propio con Docker, `docker-compose.prod.yml`
+(frontend compilado servido por nginx, Caddy con HTTPS automático, Postgres y MinIO
+en red interna), backups y checklist de seguridad.
+
 ## Cómo correrlo localmente
 
 ### Opción A: con Docker (recomendado)

@@ -1,0 +1,19 @@
+# Override temporal para correr SIN dominio, por IP y HTTP.
+# Uso:
+#   docker compose -f docker-compose.prod.yml -f docker-compose.ip.yml up -d --build
+# Requiere SERVER_IP en .env. Cuando haya dominio: completar DOMAIN/S3_DOMAIN/
+# ACME_EMAIL en .env y relanzar SOLO con docker-compose.prod.yml.
+
+services:
+  backend:
+    environment:
+      CORS_ORIGINS: http://${SERVER_IP:?define SERVER_IP en .env}
+      # Las URLs firmadas pasan por Caddy (puerto 80) hacia MinIO.
+      S3_ENDPOINT_URL: http://${SERVER_IP}
+
+  caddy:
+    environment:
+      DOMAIN: ":80"
+      ACME_EMAIL: no-tls@example.invalid
+    volumes:
+      - ./deploy/Caddyfile.ip:/etc/caddy/Caddyfile:ro

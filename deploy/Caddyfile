@@ -1,0 +1,26 @@
+{
+	email {$ACME_EMAIL}
+}
+
+# Frontend + API + MinIO en el mismo dominio (un solo certificado, sin CORS).
+{$DOMAIN} {
+	encode gzip
+
+	# URLs firmadas de MinIO (path-style): /animalopolis-examenes/...
+	# El bucket es privado; sin firma válida MinIO rechaza el acceso.
+	@s3 path /animalopolis-examenes/*
+	handle @s3 {
+		reverse_proxy minio:9000
+	}
+
+	# Backend FastAPI
+	@api path /api/* /docs /redoc /openapi.json /health
+	handle @api {
+		reverse_proxy backend:8000
+	}
+
+	# Frontend estático (nginx)
+	handle {
+		reverse_proxy frontend:80
+	}
+}

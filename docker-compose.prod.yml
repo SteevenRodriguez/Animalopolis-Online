@@ -1,0 +1,126 @@
+# Producción: docker compose -f docker-compose.prod.yml up -d --build
+# Requiere un archivo .env (ver .env.prod.example).
+# Solo Caddy expone puertos al exterior (80/443); el resto es red interna.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: animalopolis-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: animalopolis
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?define POSTGRES_PASSWORD en .env}
+      POSTGRES_DB: animalopolis
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U animalopolis -d animalopolis"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio:
+    image: minio/minio:latest
+    container_name: animalopolis-minio
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?define MINIO_ROOT_USER en .env}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?define MINIO_ROOT_PASSWORD en .env}
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    container_name: animalopolis-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 \"$$MINIO_ROOT_USER\" \"$$MINIO_ROOT_PASSWORD\" &&
+      (mc mb local/animalopolis-examenes --ignore-existing) &&
+      mc anonymous set none local/animalopolis-examenes &&
+      echo 'MinIO bucket ready (private)'
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: animalopolis-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      APP_ENV: production
+      APP_DEBUG: "false"
+      APP_SECRET_KEY: ${APP_SECRET_KEY:?define APP_SECRET_KEY en .env}
+      DATABASE_URL: postgresql+psycopg://animalopolis:${POSTGRES_PASSWORD}@postgres:5432/animalopolis
+      CORS_ORIGINS: https://${DOMAIN:?define DOMAIN en .env}
+      STORAGE_BACKEND: s3
+      # Endpoint público: las URLs firmadas deben ser accesibles desde el
+      # navegador. Caddy enruta /animalopolis-examenes/* hacia MinIO.
+      S3_ENDPOINT_URL: https://${DOMAIN}
+      S3_REGION: us-east-1
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_BUCKET: animalopolis-examenes
+      S3_USE_PATH_STYLE: "true"
+      S3_PRESIGNED_EXPIRES_SECONDS: "300"
+      WHATSAPP_SERVICE_API_KEY: ${WHATSAPP_SERVICE_API_KEY:?define WHATSAPP_SERVICE_API_KEY en .env}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-admin@animalopolis.app}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:?define BOOTSTRAP_ADMIN_PASSWORD en .env}
+      BOOTSTRAP_ADMIN_NOMBRE: ${BOOTSTRAP_ADMIN_NOMBRE:-Administrador}
+    command: >
+      sh -c "
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${UVICORN_WORKERS:-1}
+      "
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ""
+    container_name: animalopolis-frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: animalopolis-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?define ACME_EMAIL en .env}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - frontend
+      - backend
+      - minio
+
+volumes:
+  postgres-data:
+  minio-data:
+  caddy-data:
+  caddy-config:

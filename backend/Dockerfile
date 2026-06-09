@@ -13,10 +13,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Instalar solo dependencias primero (el paquete `app` aun no esta copiado);
+# asi la capa de deps se cachea y no se reinstala en cada cambio de codigo.
 COPY pyproject.toml ./
-RUN pip install --upgrade pip && pip install . && pip install ".[dev]"
+RUN python -c "import tomllib; p = tomllib.load(open('pyproject.toml','rb'))['project']; print('\n'.join(p['dependencies'] + p['optional-dependencies']['dev']))" > /tmp/requirements.txt \
+    && pip install --upgrade pip \
+    && pip install -r /tmp/requirements.txt
 
 COPY . .
+RUN pip install --no-deps .
 
 EXPOSE 8000
 
