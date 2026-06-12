@@ -1,4 +1,10 @@
-import type { EstadoEnvio, Sede, TipoConsulta, TipoExamen } from "@/types/api";
+import type { EstadoEnvio, Rol, Sede, TipoConsulta, TipoExamen } from "@/types/api";
+
+export const ROL_LABEL: Record<Rol, string> = {
+  admin: "Administrador",
+  staff: "Operador",
+  consulta: "Consulta",
+};
 
 export const SEDE_LABEL: Record<Sede, string> = {
   urdesa: "Urdesa",

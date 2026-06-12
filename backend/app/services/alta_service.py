@@ -87,3 +87,27 @@ def mark_sent(db: Session, alta: Alta) -> Alta:
     alta.enviado_at = datetime.now(timezone.utc)
     db.flush()
     return alta
+
+
+def update_alta(
+    db: Session,
+    alta: Alta,
+    *,
+    fecha_atencion: date | None = None,
+    tipo_consulta: str | None = None,
+) -> dict:
+    """Apply allowed updates in place. Returns a diff describing what changed
+    (used by the audit log). Returns {} when nothing actually changes."""
+    diff: dict = {}
+    if fecha_atencion is not None and fecha_atencion != alta.fecha_atencion:
+        diff["fecha_atencion"] = {
+            "from": alta.fecha_atencion.isoformat(),
+            "to": fecha_atencion.isoformat(),
+        }
+        alta.fecha_atencion = fecha_atencion
+    if tipo_consulta is not None and tipo_consulta != alta.tipo_consulta:
+        diff["tipo_consulta"] = {"from": alta.tipo_consulta, "to": tipo_consulta}
+        alta.tipo_consulta = tipo_consulta
+    if diff:
+        db.flush()
+    return diff

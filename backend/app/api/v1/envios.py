@@ -1,7 +1,7 @@
 import uuid
 from datetime import date, datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
@@ -11,13 +11,17 @@ from app.db.session import get_db
 from app.models.alta import Alta
 from app.models.examen import Examen
 from app.schemas.alta import AltaOut
+from app.schemas.audit import AuditAction
 from app.schemas.common import Page, PageParams
 from app.schemas.examen import ExamenOut, PresignedUrlOut
 from app.services.alta_service import build_alta_query, mark_sent
+from app.services.audit_service import log_event
 from app.services.examen_service import build_examen_query, mark_sent_examen
 from app.storage.factory import get_storage
 
 router = APIRouter()
+
+EXTERNAL_ACTOR = "service:whatsapp_external"
 
 
 # ---------- ALTAS ----------
@@ -58,13 +62,25 @@ def altas_pendientes(
     response_model=AltaOut,
     dependencies=[Depends(require_api_key)],
 )
-def marcar_alta_enviada(alta_id: uuid.UUID, db: Session = Depends(get_db)):
+def marcar_alta_enviada(
+    alta_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     alta = db.get(Alta, alta_id)
     if not alta:
         raise HTTPException(status_code=404, detail="Alta no encontrada")
     if alta.estado_envio == "enviado":
         return AltaOut.model_validate(alta)
     mark_sent(db, alta)
+    log_event(
+        db,
+        action=AuditAction.MARK_SENT_ALTA,
+        external_actor=EXTERNAL_ACTOR,
+        request=request,
+        resource_type="alta",
+        resource_id=alta.id,
+    )
     db.commit()
     db.refresh(alta)
     return AltaOut.model_validate(alta)
@@ -108,7 +124,11 @@ def examenes_pendientes(
     response_model=PresignedUrlOut,
     dependencies=[Depends(require_api_key)],
 )
-def envios_examen_file_url(examen_id: uuid.UUID, db: Session = Depends(get_db)):
+def envios_examen_file_url(
+    examen_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     examen = db.get(Examen, examen_id)
     if not examen:
         raise HTTPException(status_code=404, detail="Examen no encontrado")
@@ -117,6 +137,16 @@ def envios_examen_file_url(examen_id: uuid.UUID, db: Session = Depends(get_db)):
     url = storage.presigned_url(
         examen.storage_key, settings.S3_PRESIGNED_EXPIRES_SECONDS
     )
+    log_event(
+        db,
+        action=AuditAction.DOWNLOAD_EXAMEN,
+        external_actor=EXTERNAL_ACTOR,
+        request=request,
+        resource_type="examen",
+        resource_id=examen.id,
+        details={"via": "envios_api"},
+    )
+    db.commit()
     return PresignedUrlOut(
         url=url,
         expires_at=datetime.now(timezone.utc)
@@ -129,13 +159,25 @@ def envios_examen_file_url(examen_id: uuid.UUID, db: Session = Depends(get_db)):
     response_model=ExamenOut,
     dependencies=[Depends(require_api_key)],
 )
-def marcar_examen_enviado(examen_id: uuid.UUID, db: Session = Depends(get_db)):
+def marcar_examen_enviado(
+    examen_id: uuid.UUID,
+    request: Request,
+    db: Session = Depends(get_db),
+):
     examen = db.get(Examen, examen_id)
     if not examen:
         raise HTTPException(status_code=404, detail="Examen no encontrado")
     if examen.estado_envio == "enviado":
         return ExamenOut.model_validate(examen)
     mark_sent_examen(db, examen)
+    log_event(
+        db,
+        action=AuditAction.MARK_SENT_EXAMEN,
+        external_actor=EXTERNAL_ACTOR,
+        request=request,
+        resource_type="examen",
+        resource_id=examen.id,
+    )
     db.commit()
     db.refresh(examen)
     return ExamenOut.model_validate(examen)

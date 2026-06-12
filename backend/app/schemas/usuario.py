@@ -14,8 +14,8 @@ class UsuarioCreate(BaseModel):
 
     @model_validator(mode="after")
     def validate_rol_sede(self):
-        if self.rol == Rol.staff and self.sede is None:
-            raise ValueError("staff requiere sede asignada")
+        if self.rol in (Rol.staff, Rol.consulta) and self.sede is None:
+            raise ValueError(f"{self.rol.value} requiere sede asignada")
         if self.rol == Rol.admin and self.sede is not None:
             # admin has access to all sedes; sede must be null for clarity.
             self.sede = None

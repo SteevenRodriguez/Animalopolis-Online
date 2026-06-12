@@ -4,6 +4,7 @@ import enum
 class Rol(str, enum.Enum):
     admin = "admin"
     staff = "staff"
+    consulta = "consulta"
 
 
 class Sede(str, enum.Enum):

@@ -112,3 +112,15 @@ def mark_sent_examen(db: Session, examen: Examen) -> Examen:
     examen.enviado_at = datetime.now(timezone.utc)
     db.flush()
     return examen
+
+
+def update_examen(
+    db: Session, examen: Examen, *, tipo_examen: str | None = None
+) -> dict:
+    diff: dict = {}
+    if tipo_examen is not None and tipo_examen != examen.tipo_examen:
+        diff["tipo_examen"] = {"from": examen.tipo_examen, "to": tipo_examen}
+        examen.tipo_examen = tipo_examen
+    if diff:
+        db.flush()
+    return diff

@@ -23,6 +23,14 @@ class AltaCreate(BaseModel):
         return v
 
 
+class AltaUpdate(BaseModel):
+    """Editable fields of an alta. sede, consentimiento and mascota_id are
+    intentionally immutable (sede by rule, consentimiento as legal evidence,
+    mascota_id because re-linking would orphan history)."""
+    fecha_atencion: date | None = None
+    tipo_consulta: TipoConsulta | None = None
+
+
 class AltaOut(BaseModel):
     id: uuid.UUID
     sede: str

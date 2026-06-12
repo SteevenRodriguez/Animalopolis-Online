@@ -3,6 +3,14 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from app.models.enums import TipoExamen
+
+
+class ExamenUpdate(BaseModel):
+    """The file itself is immutable: to replace it, upload a new examen.
+    Only the clinical classification can be corrected."""
+    tipo_examen: TipoExamen | None = None
+
 
 class ExamenOut(BaseModel):
     id: uuid.UUID

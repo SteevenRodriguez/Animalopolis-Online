@@ -40,9 +40,11 @@ export function AltasListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-800">Altas</h2>
-        <Link to="/altas/nueva" className="btn-primary">
-          + Nueva alta
-        </Link>
+        {user?.rol !== "consulta" && (
+          <Link to="/altas/nueva" className="btn-primary">
+            + Nueva alta
+          </Link>
+        )}
       </div>
 
       <div className="card">

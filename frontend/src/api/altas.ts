@@ -44,3 +44,13 @@ export async function createAlta(input: CreateAltaInput): Promise<Alta> {
   const { data } = await apiClient.post<Alta>("/api/v1/altas", input);
   return data;
 }
+
+export interface UpdateAltaInput {
+  fecha_atencion?: string;
+  tipo_consulta?: TipoConsulta;
+}
+
+export async function updateAlta(id: string, input: UpdateAltaInput): Promise<Alta> {
+  const { data } = await apiClient.patch<Alta>(`/api/v1/altas/${id}`, input);
+  return data;
+}

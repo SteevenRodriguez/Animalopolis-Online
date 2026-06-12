@@ -22,12 +22,15 @@ from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.models.enums import Sede, TipoExamen
 from app.models.usuario import Usuario
+from app.schemas.audit import AuditAction
 from app.schemas.common import Page, PageParams
-from app.schemas.examen import ExamenOut, PresignedUrlOut
+from app.schemas.examen import ExamenOut, ExamenUpdate, PresignedUrlOut
+from app.services.audit_service import log_event
 from app.services.examen_service import (
     build_examen_query,
     create_examen,
     get_examen_scoped,
+    update_examen,
 )
 from app.services.file_validation import FileValidationError, validate_file
 from app.services.whatsapp_normalizer import InvalidWhatsAppNumber
@@ -62,8 +65,6 @@ async def create_examen_route(
             status_code=422, detail="El consentimiento es obligatorio"
         )
 
-    # Early reject via Content-Length when available; the real check happens
-    # after reading to defend against forged headers.
     cl = request.headers.get("content-length")
     if cl:
         try:
@@ -99,6 +100,20 @@ async def create_examen_route(
             file_mime=mime,
             created_by=user,
             storage=get_storage(),
+        )
+        log_event(
+            db,
+            action=AuditAction.CREATE_EXAMEN,
+            user=user,
+            request=request,
+            resource_type="examen",
+            resource_id=examen.id,
+            details={
+                "sede": examen.sede,
+                "tipo_examen": examen.tipo_examen,
+                "archivo_size_bytes": examen.archivo_size_bytes,
+                "archivo_mime": examen.archivo_mime,
+            },
         )
         db.commit()
     except InvalidWhatsAppNumber as e:
@@ -160,9 +175,41 @@ def get_examen(
     return ExamenOut.model_validate(examen)
 
 
+@router.patch("/{examen_id}", response_model=ExamenOut)
+def patch_examen(
+    examen_id: uuid.UUID,
+    payload: ExamenUpdate,
+    request: Request,
+    user: Usuario = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    if not has_capability(user.rol, Capability.EXAMEN_UPDATE):
+        raise HTTPException(status_code=403, detail="Permiso insuficiente")
+    examen = get_examen_scoped(db, examen_id, sede_scope_for(user))
+    if not examen:
+        raise HTTPException(status_code=404, detail="Examen no encontrado")
+    diff = update_examen(
+        db, examen,
+        tipo_examen=payload.tipo_examen.value if payload.tipo_examen else None,
+    )
+    log_event(
+        db,
+        action=AuditAction.UPDATE_EXAMEN,
+        user=user,
+        request=request,
+        resource_type="examen",
+        resource_id=examen.id,
+        details={"diff": diff} if diff else {"diff": "noop"},
+    )
+    db.commit()
+    db.refresh(examen)
+    return ExamenOut.model_validate(examen)
+
+
 @router.get("/{examen_id}/file-url", response_model=PresignedUrlOut)
 def get_examen_file_url(
     examen_id: uuid.UUID,
+    request: Request,
     user: Usuario = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -176,6 +223,16 @@ def get_examen_file_url(
     url = storage.presigned_url(
         examen.storage_key, settings.S3_PRESIGNED_EXPIRES_SECONDS
     )
+    log_event(
+        db,
+        action=AuditAction.DOWNLOAD_EXAMEN,
+        user=user,
+        request=request,
+        resource_type="examen",
+        resource_id=examen.id,
+        details={"via": "dashboard"},
+    )
+    db.commit()
     return PresignedUrlOut(
         url=url,
         expires_at=datetime.now(timezone.utc)

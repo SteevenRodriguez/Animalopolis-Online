@@ -40,9 +40,11 @@ export function ExamenesListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h2 className="text-xl font-semibold text-slate-800">Exámenes</h2>
-        <Link to="/examenes/nuevo" className="btn-primary">
-          + Cargar examen
-        </Link>
+        {user?.rol !== "consulta" && (
+          <Link to="/examenes/nuevo" className="btn-primary">
+            + Cargar examen
+          </Link>
+        )}
       </div>
 
       <div className="card">

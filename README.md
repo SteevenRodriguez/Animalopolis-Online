@@ -240,16 +240,23 @@ bootstrap_admin (corre solo en startup real, no en tests).
 
 ## Roles y permisos
 
-| Capability             | admin | staff                       |
-|------------------------|:-----:|:---------------------------:|
-| Alta — crear           |   ✓   | ✓ (solo su sede)            |
-| Alta — leer todas      |   ✓   | —                           |
-| Alta — leer su sede    |   —   | ✓                           |
-| Alta — marcar enviado  |   ✓   | —                           |
-| Examen — crear         |   ✓   | ✓ (solo su sede)            |
-| Examen — leer          |   ✓   | ✓ (solo su sede)            |
-| Examen — descargar     |   ✓   | ✓ (solo su sede)            |
-| Usuarios — gestionar   |   ✓   | —                           |
+Tres perfiles definidos por el contrato (Anexo A 2.5):
+
+| Capability                  | admin | staff (Operador)            | consulta (Consulta)         |
+|-----------------------------|:-----:|:---------------------------:|:---------------------------:|
+| Alta — crear                |   ✓   | ✓ (solo su sede)            | —                           |
+| Alta — leer todas           |   ✓   | —                           | —                           |
+| Alta — leer su sede         |   —   | ✓                           | ✓                           |
+| Alta — editar               |   ✓   | ✓ (solo su sede)            | —                           |
+| Alta — marcar enviado       |   ✓   | —                           | —                           |
+| Examen — crear              |   ✓   | ✓ (solo su sede)            | —                           |
+| Examen — leer               |   ✓   | ✓ (solo su sede)            | ✓ (solo su sede)            |
+| Examen — editar             |   ✓   | ✓ (solo su sede)            | —                           |
+| Examen — descargar (URL)    |   ✓   | ✓ (solo su sede)            | ✓ (solo su sede)            |
+| Propietario — editar        |   ✓   | —                           | —                           |
+| Mascota — editar            |   ✓   | —                           | —                           |
+| Usuarios — gestionar        |   ✓   | —                           | —                           |
+| Auditoría — leer            |   ✓   | —                           | —                           |
 
 Añadir un rol nuevo (p.ej. `recepcion`) requiere solo dos cambios:
 1. Agregar el valor al enum `Rol` en `app/models/enums.py`.
@@ -257,6 +264,29 @@ Añadir un rol nuevo (p.ej. `recepcion`) requiere solo dos cambios:
 
 Ningún endpoint pregunta por rol directamente; todos van por `Capability`, así que
 no hace falta refactorizar.
+
+## Auditoría
+
+Tabla `audit_log` con una fila por evento significativo. Eventos cubiertos
+(Anexo A 2.6 + Cláusula 16):
+
+- `login`, `login_failed` — inicios de sesión (éxito y falla)
+- `create_alta`, `update_alta`, `mark_sent_alta`
+- `create_examen`, `update_examen`, `download_examen`, `mark_sent_examen`
+- `update_propietario`, `update_mascota`
+- `create_user`, `update_user`, `deactivate_user`
+
+Cada fila guarda: timestamp, user_id + email + rol + sede (denormalizados), acción,
+recurso (tipo + id), éxito/falla, IP, user-agent y un JSON con detalles
+(p. ej. el diff de un PATCH, el actor externo para acciones vía X-API-Key,
+el tamaño del archivo descargado).
+
+Las acciones del sistema externo de WhatsApp (marcar-enviado, descarga vía
+`/envios`) se identifican con `user_email = "service:whatsapp_external"`
+y `user_rol = "service"`.
+
+Consulta: `GET /api/v1/auditoria?action=&user_id=&desde=&hasta=&success=`
+(admin). El frontend tiene la pestaña **Auditoría** visible solo para admin.
 
 ## Modelo de datos (resumen)
 

@@ -1,4 +1,4 @@
-export type Rol = "admin" | "staff";
+export type Rol = "admin" | "staff" | "consulta";
 export type Sede = "urdesa" | "ciudad_celeste";
 export type EstadoEnvio = "pendiente" | "enviado" | "fallido";
 
@@ -81,4 +81,20 @@ export interface Page<T> {
 
 export interface ApiErrorBody {
   error?: { code?: string; message?: string; details?: unknown };
+}
+
+export interface AuditLog {
+  id: string;
+  timestamp: string;
+  user_id: string | null;
+  user_email: string | null;
+  user_rol: string | null;
+  user_sede: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  success: boolean;
+  ip: string | null;
+  user_agent: string | null;
+  details: Record<string, unknown> | null;
 }

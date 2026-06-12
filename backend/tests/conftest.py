@@ -119,8 +119,28 @@ def staff_ciudad_celeste(db_session):
 
 
 @pytest.fixture()
+def consulta_urdesa(db_session):
+    user = create_user(
+        db_session,
+        email="consulta@example.com",
+        password="ConsultaPass!2026",
+        nombre="Consulta Urdesa",
+        rol=Rol.consulta.value,
+        sede=Sede.urdesa.value,
+    )
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture()
 def token_admin(admin_user):
     return issue_token(admin_user)
+
+
+@pytest.fixture()
+def token_consulta(consulta_urdesa):
+    return issue_token(consulta_urdesa)
 
 
 @pytest.fixture()
@@ -135,6 +155,27 @@ def token_celeste(staff_ciudad_celeste):
 
 def auth(token: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limiter():
+    """Slowapi keeps in-memory buckets per IP; tests share the testclient IP.
+    Reset before each test so rate-limit-aware tests are deterministic and
+    other tests don't accidentally trip the limit."""
+    from app.core.rate_limit import limiter
+    try:
+        if hasattr(limiter, "reset"):
+            limiter.reset()
+        else:
+            storage = getattr(limiter, "_storage", None)
+            if storage is not None:
+                if hasattr(storage, "storage") and hasattr(storage.storage, "clear"):
+                    storage.storage.clear()
+                elif hasattr(storage, "reset"):
+                    storage.reset()
+    except Exception:
+        pass
+    yield
 
 
 @pytest.fixture()

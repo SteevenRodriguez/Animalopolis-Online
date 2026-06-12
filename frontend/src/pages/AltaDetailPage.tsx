@@ -2,17 +2,20 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 import { getAlta } from "@/api/altas";
 import { extractApiError } from "@/api/client";
+import { useAuth } from "@/auth/AuthContext";
 import { EstadoEnvioBadge } from "@/components/Badge";
 import { SEDE_LABEL, TIPO_CONSULTA_LABEL } from "@/lib/enums";
 import { formatDate, formatDateTime } from "@/lib/format";
 
 export function AltaDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
   const q = useQuery({
     queryKey: ["alta", id],
     queryFn: () => getAlta(id!),
     enabled: !!id,
   });
+  const canEdit = user?.rol === "admin" || user?.rol === "staff";
 
   if (q.isLoading) return <div className="text-slate-500">Cargando…</div>;
   if (q.isError) {
@@ -26,9 +29,16 @@ export function AltaDetailPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-2">
         <h2 className="text-xl font-semibold text-slate-800">Detalle de alta</h2>
-        <Link to="/altas" className="btn-secondary">← Volver</Link>
+        <div className="flex gap-2">
+          {canEdit && (
+            <Link to={`/altas/${a.id}/editar`} className="btn-secondary">
+              Editar
+            </Link>
+          )}
+          <Link to="/altas" className="btn-secondary">← Volver</Link>
+        </div>
       </div>
       <div className="card grid grid-cols-1 gap-4 sm:grid-cols-2">
         <Field label="Sede" value={SEDE_LABEL[a.sede]} />
